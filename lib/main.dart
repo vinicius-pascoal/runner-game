@@ -71,17 +71,23 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   double _worldSpeed = 250;
   double _groundStripeOffset = 0;
 
+  double _animationTime = 0;
+  double _farParallaxOffset = 0;
+  double _midParallaxOffset = 0;
+  double _nearParallaxOffset = 0;
+
   double _obstacleSpawnTimer = 0;
   double _nextObstacleSpawnTime = 1.45;
   double _coinSpawnTimer = 0;
   double _nextCoinSpawnTime = 1.15;
+
+  int _lastCoinSoundAtMs = 0;
 
   final List<Obstacle> _obstacles = [];
   final List<CoinItem> _coins = [];
 
   double get _groundTop => _screenHeight - _groundHeight;
   double get _playerGroundY => _groundTop - _playerSize;
-  bool get _isOnGround => (_playerY - _playerGroundY).abs() < 1.0;
 
   @override
   void initState() {
@@ -143,6 +149,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   }
 
   void _updateGame(double dt) {
+    _animationTime += dt;
     _updateDifficulty();
 
     _playerVelocityY += _gravity * dt;
@@ -154,10 +161,12 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       _jumpsUsed = 0;
     }
 
-    // pontuação sobe mais devagar
     _score += dt * (7.5 + (_difficultyLevel - 1) * 0.18);
 
     _groundStripeOffset = (_groundStripeOffset + (_worldSpeed * dt)) % 44.0;
+    _farParallaxOffset = (_farParallaxOffset + (_worldSpeed * 0.07 * dt)) % 420;
+    _midParallaxOffset = (_midParallaxOffset + (_worldSpeed * 0.14 * dt)) % 520;
+    _nearParallaxOffset = (_nearParallaxOffset + (_worldSpeed * 0.24 * dt)) % 620;
 
     _obstacleSpawnTimer += dt;
     if (_obstacleSpawnTimer >= _nextObstacleSpawnTime) {
@@ -210,8 +219,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     final difficultyBias = min(_score / 70.0, 3.0);
 
     int count = 1;
-
-    // obstáculos duplos só mais tarde
     if (_score >= 80 && _random.nextDouble() < 0.18) {
       count = 2;
     }
@@ -240,16 +247,16 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
 
     int count;
     if (_score < 50) {
-      count = 3 + _random.nextInt(2); // 3..4
+      count = 3 + _random.nextInt(2);
     } else {
-      count = 3 + _random.nextInt(3); // 3..5
+      count = 3 + _random.nextInt(3);
     }
 
     final spacing = 42.0;
     final baseHeight = 95 + _random.nextDouble() * 90;
 
     for (int i = 0; i < count; i++) {
-      double x = startX + i * spacing;
+      final x = startX + i * spacing;
       double y = _groundTop - baseHeight;
 
       if (isArc) {
@@ -270,8 +277,9 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
         _coins.add(
           CoinItem(
             x: x,
-            y: safeY,
+            baseY: safeY,
             size: 18,
+            phase: _random.nextDouble() * pi * 2,
           ),
         );
       }
@@ -286,7 +294,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     double y = proposedY;
 
     for (int attempt = 0; attempt < 6; attempt++) {
-      final coinRect = Rect.fromLTWH(x, y, size, size);
+      final coinRect = Rect.fromLTWH(x, y - 10, size, size + 20);
       bool hasOverlap = false;
       double highestTop = double.infinity;
 
@@ -308,7 +316,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
         return y;
       }
 
-      y = highestTop - size - 18;
+      y = highestTop - size - 26;
     }
 
     if (y < 40) {
@@ -316,6 +324,10 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     }
 
     return y;
+  }
+
+  double _coinVisualY(CoinItem coin) {
+    return coin.baseY + sin((_animationTime * 4.2) + coin.phase) * 8.0;
   }
 
   void _checkCollisions() {
@@ -344,7 +356,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       final coin = _coins[i];
       final coinRect = Rect.fromLTWH(
         coin.x,
-        coin.y,
+        _coinVisualY(coin),
         coin.size,
         coin.size,
       );
@@ -353,6 +365,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
         _coinsCollected += 1;
         _score += 1.5;
         _coins.removeAt(i);
+        _playCoinSound();
       }
     }
   }
@@ -369,6 +382,23 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     }
   }
 
+  void _playJumpSound() {
+    SystemSound.play(SystemSoundType.click);
+  }
+
+  void _playCoinSound() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastCoinSoundAtMs < 90) return;
+
+    _lastCoinSoundAtMs = now;
+    SystemSound.play(SystemSoundType.click);
+
+    Future.delayed(const Duration(milliseconds: 45), () {
+      if (!mounted || _gameOver) return;
+      SystemSound.play(SystemSoundType.click);
+    });
+  }
+
   void _jump() {
     if (!_isPlaying || _gameOver || _isPaused) return;
     if (_jumpsUsed >= _maxJumps) return;
@@ -376,6 +406,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     _playerVelocityY =
     _jumpsUsed == 0 ? _jumpVelocity : _jumpVelocity * 0.92;
     _jumpsUsed += 1;
+    _playJumpSound();
   }
 
   void _resetWorld({required bool startPlaying, bool autoJump = false}) {
@@ -387,6 +418,11 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     _difficultyLevel = 1;
     _worldSpeed = 250;
     _groundStripeOffset = 0;
+
+    _animationTime = 0;
+    _farParallaxOffset = 0;
+    _midParallaxOffset = 0;
+    _nearParallaxOffset = 0;
 
     _playerY = _playerGroundY;
     _playerVelocityY = 0;
@@ -501,11 +537,15 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           playerSize: _playerSize,
                           groundHeight: _groundHeight,
                           groundStripeOffset: _groundStripeOffset,
+                          farParallaxOffset: _farParallaxOffset,
+                          midParallaxOffset: _midParallaxOffset,
+                          nearParallaxOffset: _nearParallaxOffset,
                           obstacles: _obstacles,
                           coins: _coins,
                           jumpsRemaining: _maxJumps - _jumpsUsed,
                           gameOver: _gameOver,
                           isPaused: _isPaused,
+                          animationTime: _animationTime,
                         ),
                       ),
                     ),
@@ -538,7 +578,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           subtitle:
                           'Recorde: $_highScore\n\n'
                               'Toque na tela ou pressione Espaço / ↑ / W para começar.\n'
-                              'Você tem duplo pulo, pode coletar moedas e usar P para pausar.',
+                              'Duplo pulo, moedas flutuantes, parallax e pausa com P.',
                         ),
                       ),
 
@@ -552,12 +592,10 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                       ),
 
                     if (_gameOver)
-                      Center(
+                      const Center(
                         child: OverlayPanel(
                           title: 'Game Over',
-                          subtitle:
-                          'Pontuação final registrada.\n'
-                              'Toque para reiniciar.',
+                          subtitle: 'Toque para reiniciar.',
                         ),
                       ),
 
@@ -613,13 +651,15 @@ class Obstacle {
 class CoinItem {
   CoinItem({
     required this.x,
-    required this.y,
+    required this.baseY,
     required this.size,
+    required this.phase,
   });
 
   double x;
-  final double y;
+  final double baseY;
   final double size;
+  final double phase;
 }
 
 class RunnerPainter extends CustomPainter {
@@ -629,11 +669,15 @@ class RunnerPainter extends CustomPainter {
     required this.playerSize,
     required this.groundHeight,
     required this.groundStripeOffset,
+    required this.farParallaxOffset,
+    required this.midParallaxOffset,
+    required this.nearParallaxOffset,
     required this.obstacles,
     required this.coins,
     required this.jumpsRemaining,
     required this.gameOver,
     required this.isPaused,
+    required this.animationTime,
   });
 
   final double playerX;
@@ -641,17 +685,21 @@ class RunnerPainter extends CustomPainter {
   final double playerSize;
   final double groundHeight;
   final double groundStripeOffset;
+  final double farParallaxOffset;
+  final double midParallaxOffset;
+  final double nearParallaxOffset;
   final List<Obstacle> obstacles;
   final List<CoinItem> coins;
   final int jumpsRemaining;
   final bool gameOver;
   final bool isPaused;
+  final double animationTime;
 
   @override
   void paint(Canvas canvas, Size size) {
     _drawBackground(canvas, size);
     _drawMoon(canvas, size);
-    _drawHorizon(canvas, size);
+    _drawParallaxLayers(canvas, size);
     _drawGround(canvas, size);
     _drawCoins(canvas);
     _drawObstacles(canvas, size);
@@ -700,24 +748,86 @@ class RunnerPainter extends CustomPainter {
     );
   }
 
-  void _drawHorizon(Canvas canvas, Size size) {
-    final horizonY = size.height - groundHeight - 58;
+  void _drawParallaxLayers(Canvas canvas, Size size) {
+    final farY = size.height - groundHeight - 80;
+    final midY = size.height - groundHeight - 60;
+    final nearY = size.height - groundHeight - 42;
 
-    final farPaint = Paint()..color = const Color(0xFF10203A).withOpacity(0.55);
-    final midPaint = Paint()..color = const Color(0xFF152744).withOpacity(0.82);
+    _drawCityLayer(
+      canvas,
+      size,
+      baseY: farY,
+      offset: farParallaxOffset,
+      color: const Color(0xFF0F2038).withOpacity(0.45),
+      minWidth: 26,
+      widthRange: 20,
+      minHeight: 30,
+      heightRange: 30,
+      gap: 16,
+    );
 
-    for (int i = 0; i < 12; i++) {
-      final x = i * (size.width / 10.5) - 16;
-      final w = 24 + (i % 3) * 16.0;
-      final h = 38 + (i % 4) * 18.0;
-      canvas.drawRect(Rect.fromLTWH(x, horizonY - h, w, h), farPaint);
-    }
+    _drawCityLayer(
+      canvas,
+      size,
+      baseY: midY,
+      offset: midParallaxOffset,
+      color: const Color(0xFF152744).withOpacity(0.72),
+      minWidth: 30,
+      widthRange: 24,
+      minHeight: 40,
+      heightRange: 42,
+      gap: 14,
+    );
 
-    for (int i = 0; i < 9; i++) {
-      final x = i * (size.width / 8) + 8;
-      final w = 34 + (i % 2) * 18.0;
-      final h = 52 + (i % 3) * 26.0;
-      canvas.drawRect(Rect.fromLTWH(x, horizonY - h + 18, w, h), midPaint);
+    _drawCityLayer(
+      canvas,
+      size,
+      baseY: nearY,
+      offset: nearParallaxOffset,
+      color: const Color(0xFF1B3154).withOpacity(0.95),
+      minWidth: 36,
+      widthRange: 28,
+      minHeight: 55,
+      heightRange: 46,
+      gap: 12,
+    );
+  }
+
+  void _drawCityLayer(
+      Canvas canvas,
+      Size size, {
+        required double baseY,
+        required double offset,
+        required Color color,
+        required double minWidth,
+        required double widthRange,
+        required double minHeight,
+        required double heightRange,
+        required double gap,
+      }) {
+    final paint = Paint()..color = color;
+
+    double x = -offset;
+    int i = 0;
+
+    while (x < size.width + 120) {
+      final width = minWidth + (i % 4) * (widthRange / 3);
+      final height = minHeight + ((i * 7) % 5) * (heightRange / 4);
+
+      canvas.drawRect(
+        Rect.fromLTWH(x, baseY - height, width, height),
+        paint,
+      );
+
+      if (i.isEven) {
+        canvas.drawRect(
+          Rect.fromLTWH(x + width * 0.22, baseY - height - 10, width * 0.16, 10),
+          paint,
+        );
+      }
+
+      x += width + gap;
+      i++;
     }
   }
 
@@ -758,13 +868,18 @@ class RunnerPainter extends CustomPainter {
     }
   }
 
+  double _coinVisualY(CoinItem coin) {
+    return coin.baseY + sin((animationTime * 4.2) + coin.phase) * 8.0;
+  }
+
   void _drawCoins(Canvas canvas) {
     final outerPaint = Paint()..color = const Color(0xFFFFD54F);
     final innerPaint = Paint()..color = const Color(0xFFFFB300);
     final shinePaint = Paint()..color = Colors.white70;
 
     for (final coin in coins) {
-      final center = Offset(coin.x + coin.size / 2, coin.y + coin.size / 2);
+      final y = _coinVisualY(coin);
+      final center = Offset(coin.x + coin.size / 2, y + coin.size / 2);
 
       canvas.drawCircle(center, coin.size / 2, outerPaint);
       canvas.drawCircle(center, coin.size / 2.8, innerPaint);
@@ -855,6 +970,7 @@ class RunnerPainter extends CustomPainter {
       4.4,
       eyePaint,
     );
+
     canvas.drawCircle(
       Offset(playerX + playerSize * 0.70, playerY + playerSize * 0.32),
       2.0,
