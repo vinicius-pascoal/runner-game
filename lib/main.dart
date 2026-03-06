@@ -47,20 +47,18 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   double _screenWidth = 0;
   double _screenHeight = 0;
 
-  // Mundo
   final double _groundHeight = 112;
   final double _playerSize = 42;
   final double _playerX = 84;
 
-  // Física
   final double _gravity = 1850;
   final double _jumpVelocity = -760;
+
   double _playerY = 0;
   double _playerVelocityY = 0;
   int _jumpsUsed = 0;
   final int _maxJumps = 2;
 
-  // Estado do jogo
   bool _isPlaying = false;
   bool _gameOver = false;
   bool _isPaused = false;
@@ -70,17 +68,14 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   int _highScore = 0;
   int _difficultyLevel = 1;
 
-  // Ritmo do mundo
-  double _worldSpeed = 280;
+  double _worldSpeed = 250;
   double _groundStripeOffset = 0;
 
-  // Spawn
   double _obstacleSpawnTimer = 0;
-  double _nextObstacleSpawnTime = 1.2;
+  double _nextObstacleSpawnTime = 1.45;
   double _coinSpawnTimer = 0;
-  double _nextCoinSpawnTime = 0.95;
+  double _nextCoinSpawnTime = 1.15;
 
-  // Objetos em cena
   final List<Obstacle> _obstacles = [];
   final List<CoinItem> _coins = [];
 
@@ -91,7 +86,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   @override
   void initState() {
     super.initState();
-
     _loadHighScore();
 
     _ticker = createTicker(_onTick)..start();
@@ -151,7 +145,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   void _updateGame(double dt) {
     _updateDifficulty();
 
-    // Física do jogador
     _playerVelocityY += _gravity * dt;
     _playerY += _playerVelocityY * dt;
 
@@ -161,14 +154,11 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       _jumpsUsed = 0;
     }
 
-    // Pontuação baseada em tempo e dificuldade
-    _score += dt * (10 + (_difficultyLevel - 1) * 0.45);
+    // pontuação sobe mais devagar
+    _score += dt * (7.5 + (_difficultyLevel - 1) * 0.18);
 
-    // Movimento do chão
-    _groundStripeOffset =
-        (_groundStripeOffset + (_worldSpeed * dt)) % 44.0;
+    _groundStripeOffset = (_groundStripeOffset + (_worldSpeed * dt)) % 44.0;
 
-    // Spawn obstáculos
     _obstacleSpawnTimer += dt;
     if (_obstacleSpawnTimer >= _nextObstacleSpawnTime) {
       _spawnObstacleWave();
@@ -176,7 +166,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       _scheduleNextObstacleSpawn();
     }
 
-    // Spawn moedas
     _coinSpawnTimer += dt;
     if (_coinSpawnTimer >= _nextCoinSpawnTime) {
       _spawnCoinPattern();
@@ -184,13 +173,11 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       _scheduleNextCoinSpawn();
     }
 
-    // Atualiza obstáculos
     for (final obstacle in _obstacles) {
       obstacle.x -= _worldSpeed * dt;
     }
     _obstacles.removeWhere((o) => o.x + o.width < -24);
 
-    // Atualiza moedas
     for (final coin in _coins) {
       coin.x -= _worldSpeed * dt;
     }
@@ -200,38 +187,40 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   }
 
   void _updateDifficulty() {
-    _difficultyLevel = max(1, 1 + (_score ~/ 25));
+    _difficultyLevel = max(1, 1 + (_score ~/ 40));
 
-    final ramp = min(_score / 18.0, 12.0);
-    _worldSpeed = 280 + ramp * 22;
+    final ramp = min(_score / 35.0, 10.0);
+    _worldSpeed = 250 + ramp * 11;
   }
 
   void _scheduleNextObstacleSpawn() {
-    final ramp = min(_score / 18.0, 12.0);
-    final base = max(0.58, 1.35 - ramp * 0.065);
-    _nextObstacleSpawnTime = base + _random.nextDouble() * 0.35;
+    final ramp = min(_score / 40.0, 8.0);
+    final base = max(0.95, 1.55 - ramp * 0.05);
+    _nextObstacleSpawnTime = base + _random.nextDouble() * 0.38;
   }
 
   void _scheduleNextCoinSpawn() {
-    final ramp = min(_score / 20.0, 10.0);
-    final base = max(0.72, 1.12 - ramp * 0.04);
-    _nextCoinSpawnTime = base + _random.nextDouble() * 0.45;
+    final ramp = min(_score / 45.0, 8.0);
+    final base = max(0.95, 1.20 - ramp * 0.03);
+    _nextCoinSpawnTime = base + _random.nextDouble() * 0.40;
   }
 
   void _spawnObstacleWave() {
     final startX = _screenWidth + 20;
-    final difficultyBias = min(_score / 40.0, 4.0);
+    final difficultyBias = min(_score / 70.0, 3.0);
 
     int count = 1;
-    if (_score >= 35 && _random.nextDouble() < 0.28) {
+
+    // obstáculos duplos só mais tarde
+    if (_score >= 80 && _random.nextDouble() < 0.18) {
       count = 2;
     }
 
     double currentX = startX;
 
     for (int i = 0; i < count; i++) {
-      final width = 30 + _random.nextDouble() * 24 + difficultyBias * 4;
-      final height = 36 + _random.nextDouble() * (54 + difficultyBias * 12);
+      final width = 30 + _random.nextDouble() * 20 + difficultyBias * 3;
+      final height = 34 + _random.nextDouble() * (42 + difficultyBias * 10);
 
       _obstacles.add(
         Obstacle(
@@ -241,43 +230,92 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
         ),
       );
 
-      currentX += 118 + _random.nextDouble() * 56;
+      currentX += 150 + _random.nextDouble() * 70;
     }
   }
 
   void _spawnCoinPattern() {
-    final startX = _screenWidth + 50;
+    final startX = _screenWidth + 60;
     final isArc = _random.nextBool();
 
     int count;
-    if (_score < 30) {
+    if (_score < 50) {
       count = 3 + _random.nextInt(2); // 3..4
     } else {
       count = 3 + _random.nextInt(3); // 3..5
     }
 
-    final baseHeight = 72 + _random.nextDouble() * 115;
     final spacing = 42.0;
+    final baseHeight = 95 + _random.nextDouble() * 90;
 
     for (int i = 0; i < count; i++) {
+      double x = startX + i * spacing;
       double y = _groundTop - baseHeight;
 
       if (isArc) {
-        final arcProgress = count == 1 ? 0.0 : i / (count - 1);
-        final arcOffset = sin(arcProgress * pi) * 26;
+        final progress = count == 1 ? 0.0 : i / (count - 1);
+        final arcOffset = sin(progress * pi) * 26;
         y -= arcOffset;
       } else {
         y -= (i.isEven ? 0 : 10);
       }
 
-      _coins.add(
-        CoinItem(
-          x: startX + i * spacing,
-          y: y,
-          size: 18,
-        ),
+      final safeY = _adjustCoinYToAvoidObstacles(
+        x: x,
+        proposedY: y,
+        size: 18,
       );
+
+      if (safeY != null) {
+        _coins.add(
+          CoinItem(
+            x: x,
+            y: safeY,
+            size: 18,
+          ),
+        );
+      }
     }
+  }
+
+  double? _adjustCoinYToAvoidObstacles({
+    required double x,
+    required double proposedY,
+    required double size,
+  }) {
+    double y = proposedY;
+
+    for (int attempt = 0; attempt < 6; attempt++) {
+      final coinRect = Rect.fromLTWH(x, y, size, size);
+      bool hasOverlap = false;
+      double highestTop = double.infinity;
+
+      for (final obstacle in _obstacles) {
+        final obstacleRect = Rect.fromLTWH(
+          obstacle.x - 6,
+          _groundTop - obstacle.height - 6,
+          obstacle.width + 12,
+          obstacle.height + 12,
+        );
+
+        if (coinRect.overlaps(obstacleRect)) {
+          hasOverlap = true;
+          highestTop = min(highestTop, obstacleRect.top);
+        }
+      }
+
+      if (!hasOverlap) {
+        return y;
+      }
+
+      y = highestTop - size - 18;
+    }
+
+    if (y < 40) {
+      return null;
+    }
+
+    return y;
   }
 
   void _checkCollisions() {
@@ -313,7 +351,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
 
       if (playerRect.overlaps(coinRect)) {
         _coinsCollected += 1;
-        _score += 2;
+        _score += 1.5;
         _coins.removeAt(i);
       }
     }
@@ -347,7 +385,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     _score = 0;
     _coinsCollected = 0;
     _difficultyLevel = 1;
-    _worldSpeed = 280;
+    _worldSpeed = 250;
     _groundStripeOffset = 0;
 
     _playerY = _playerGroundY;
@@ -476,59 +514,31 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                       top: 14,
                       left: 14,
                       right: 14,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            HudCard(
-                              icon: Icons.speed_rounded,
-                              label: 'Pontos',
-                              value: _score.floor().toString(),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TopHudBar(
+                              score: _score.floor(),
+                              coins: _coinsCollected,
                             ),
-                            const SizedBox(width: 10),
-                            HudCard(
-                              icon: Icons.monetization_on_rounded,
-                              label: 'Moedas',
-                              value: _coinsCollected.toString(),
-                            ),
-                            const SizedBox(width: 10),
-                            HudCard(
-                              icon: Icons.workspace_premium_rounded,
-                              label: 'Recorde',
-                              value: _highScore.toString(),
-                            ),
-                            const SizedBox(width: 10),
-                            HudCard(
-                              icon: Icons.trending_up_rounded,
-                              label: 'Nível',
-                              value: _difficultyLevel.toString(),
-                            ),
-                            const SizedBox(width: 10),
-                            HudCard(
-                              icon: Icons.double_arrow_rounded,
-                              label: 'Pulos',
-                              value: '${_maxJumps - _jumpsUsed}',
-                            ),
-                            const SizedBox(width: 12),
-                            RoundGlassButton(
-                              icon: _isPaused
-                                  ? Icons.play_arrow_rounded
-                                  : Icons.pause_rounded,
-                              tooltip: _isPaused ? 'Continuar' : 'Pausar',
-                              onTap: _togglePause,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 10),
+                          PauseButton(
+                            isPaused: _isPaused,
+                            onTap: _togglePause,
+                          ),
+                        ],
                       ),
                     ),
 
                     if (!_isPlaying && !_gameOver)
-                      const Center(
+                      Center(
                         child: OverlayPanel(
                           title: 'Infinite Runner',
                           subtitle:
-                          'Toque na tela ou pressione Espaço / ↑ / W para começar.\n'
-                              'Você tem duplo pulo, pode coletar moedas e usar P ou o botão para pausar.',
+                          'Recorde: $_highScore\n\n'
+                              'Toque na tela ou pressione Espaço / ↑ / W para começar.\n'
+                              'Você tem duplo pulo, pode coletar moedas e usar P para pausar.',
                         ),
                       ),
 
@@ -546,9 +556,20 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                         child: OverlayPanel(
                           title: 'Game Over',
                           subtitle:
-                          'Pontuação: ${_score.floor()}\n'
-                              'Moedas: $_coinsCollected\n'
+                          'Pontuação final registrada.\n'
                               'Toque para reiniciar.',
+                        ),
+                      ),
+
+                    if (_gameOver)
+                      Positioned(
+                        left: 22,
+                        right: 22,
+                        bottom: 70,
+                        child: ResultSummary(
+                          score: _score.floor(),
+                          coins: _coinsCollected,
+                          highScore: _highScore,
                         ),
                       ),
 
@@ -840,7 +861,6 @@ class RunnerPainter extends CustomPainter {
       pupilPaint,
     );
 
-    // Sinaliza visualmente o duplo pulo restante
     for (int i = 0; i < jumpsRemaining; i++) {
       canvas.drawCircle(
         Offset(playerX + 10 + i * 10, playerY - 8),
@@ -854,23 +874,21 @@ class RunnerPainter extends CustomPainter {
   bool shouldRepaint(covariant RunnerPainter oldDelegate) => true;
 }
 
-class HudCard extends StatelessWidget {
-  const HudCard({
+class TopHudBar extends StatelessWidget {
+  const TopHudBar({
     super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
+    required this.score,
+    required this.coins,
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
+  final int score;
+  final int coins;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 110),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
@@ -889,31 +907,31 @@ class HudCard extends StatelessWidget {
         ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: Colors.white70),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+          const Icon(Icons.speed_rounded, size: 18, color: Colors.white70),
+          const SizedBox(width: 8),
+          Text(
+            'Pontos: $score',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          const Icon(
+            Icons.monetization_on_rounded,
+            size: 18,
+            color: Color(0xFFFFD54F),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$coins',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
@@ -921,44 +939,116 @@ class HudCard extends StatelessWidget {
   }
 }
 
-class RoundGlassButton extends StatelessWidget {
-  const RoundGlassButton({
+class PauseButton extends StatelessWidget {
+  const PauseButton({
     super.key,
-    required this.icon,
-    required this.tooltip,
+    required this.isPaused,
     required this.onTap,
   });
 
-  final IconData icon;
-  final String tooltip;
+  final bool isPaused;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Ink(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xAA101B2D),
-                  Color(0xAA24395C),
-                ],
-              ),
-              border: Border.all(color: Colors.white12),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xAA101B2D),
+                Color(0xAA24395C),
+              ],
             ),
-            child: Icon(icon, color: Colors.white, size: 28),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Icon(
+            isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            color: Colors.white,
+            size: 28,
           ),
         ),
       ),
+    );
+  }
+}
+
+class ResultSummary extends StatelessWidget {
+  const ResultSummary({
+    super.key,
+    required this.score,
+    required this.coins,
+    required this.highScore,
+  });
+
+  final int score;
+  final int coins;
+  final int highScore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xCC101A2C),
+            Color(0xCC213558),
+          ],
+        ),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _ResultItem(label: 'Pontuação', value: '$score'),
+          _ResultItem(label: 'Moedas', value: '$coins'),
+          _ResultItem(label: 'Recorde', value: '$highScore'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultItem extends StatelessWidget {
+  const _ResultItem({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
