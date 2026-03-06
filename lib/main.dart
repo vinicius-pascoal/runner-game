@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -38,6 +39,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   static const String _highScoreKey = 'infinite_runner_high_score';
 
   late final Ticker _ticker;
+
   final FocusNode _focusNode = FocusNode();
   final Random _random = Random();
 
@@ -81,17 +83,21 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   double _coinSpawnTimer = 0;
   double _nextCoinSpawnTime = 1.15;
 
-  int _lastCoinSoundAtMs = 0;
+  int _lastFeedbackAtMs = 0;
 
   final List<Obstacle> _obstacles = [];
   final List<CoinItem> _coins = [];
+  final List<DustParticle> _dustParticles = [];
+  final List<SparkParticle> _sparkParticles = [];
 
   double get _groundTop => _screenHeight - _groundHeight;
   double get _playerGroundY => _groundTop - _playerSize;
+  bool get _isOnGround => (_playerY - _playerGroundY).abs() < 1.0;
 
   @override
   void initState() {
     super.initState();
+
     _loadHighScore();
 
     _ticker = createTicker(_onTick)..start();
@@ -141,6 +147,8 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
 
     if (_isPlaying && !_gameOver && !_isPaused) {
       _updateGame(dt);
+    } else {
+      _animationTime += dt;
     }
 
     if (mounted) {
@@ -192,12 +200,12 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     }
     _coins.removeWhere((c) => c.x + c.size < -20);
 
+    _updateParticles(dt);
     _checkCollisions();
   }
 
   void _updateDifficulty() {
     _difficultyLevel = max(1, 1 + (_score ~/ 40));
-
     final ramp = min(_score / 35.0, 10.0);
     _worldSpeed = 250 + ramp * 11;
   }
@@ -330,6 +338,75 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     return coin.baseY + sin((_animationTime * 4.2) + coin.phase) * 8.0;
   }
 
+  void _updateParticles(double dt) {
+    for (final particle in _dustParticles) {
+      particle.update(dt);
+    }
+    _dustParticles.removeWhere((p) => !p.alive);
+
+    for (final particle in _sparkParticles) {
+      particle.update(dt);
+    }
+    _sparkParticles.removeWhere((p) => !p.alive);
+  }
+
+  void _spawnJumpDust() {
+    for (int i = 0; i < 8; i++) {
+      _dustParticles.add(
+        DustParticle(
+          x: _playerX + 8 + _random.nextDouble() * (_playerSize - 16),
+          y: _groundTop + 2,
+          vx: -70 + _random.nextDouble() * 140,
+          vy: -30 - _random.nextDouble() * 85,
+          size: 3 + _random.nextDouble() * 5,
+          maxLife: 0.22 + _random.nextDouble() * 0.18,
+        ),
+      );
+    }
+  }
+
+  void _spawnCoinSparkles(double x, double y) {
+    for (int i = 0; i < 12; i++) {
+      final angle = _random.nextDouble() * pi * 2;
+      final speed = 35 + _random.nextDouble() * 120;
+
+      _sparkParticles.add(
+        SparkParticle(
+          x: x,
+          y: y,
+          vx: cos(angle) * speed,
+          vy: sin(angle) * speed,
+          size: 2 + _random.nextDouble() * 3,
+          maxLife: 0.22 + _random.nextDouble() * 0.22,
+        ),
+      );
+    }
+  }
+
+  Future<void> _playJumpFeedback() async {
+    try {
+      await HapticFeedback.lightImpact();
+    } catch (_) {}
+
+    try {
+      await SystemSound.play(SystemSoundType.click);
+    } catch (_) {}
+  }
+
+  Future<void> _playCoinFeedback() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastFeedbackAtMs < 70) return;
+    _lastFeedbackAtMs = now;
+
+    try {
+      await HapticFeedback.selectionClick();
+    } catch (_) {}
+
+    try {
+      await SystemSound.play(SystemSoundType.click);
+    } catch (_) {}
+  }
+
   void _checkCollisions() {
     final playerRect = Rect.fromLTWH(
       _playerX,
@@ -354,9 +431,10 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
 
     for (int i = _coins.length - 1; i >= 0; i--) {
       final coin = _coins[i];
+      final visualY = _coinVisualY(coin);
       final coinRect = Rect.fromLTWH(
         coin.x,
-        _coinVisualY(coin),
+        visualY,
         coin.size,
         coin.size,
       );
@@ -364,8 +442,14 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       if (playerRect.overlaps(coinRect)) {
         _coinsCollected += 1;
         _score += 1.5;
+
+        _spawnCoinSparkles(
+          coin.x + coin.size / 2,
+          visualY + coin.size / 2,
+        );
+
         _coins.removeAt(i);
-        _playCoinSound();
+        _playCoinFeedback();
       }
     }
   }
@@ -382,36 +466,28 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     }
   }
 
-  void _playJumpSound() {
-    SystemSound.play(SystemSoundType.click);
-  }
-
-  void _playCoinSound() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastCoinSoundAtMs < 90) return;
-
-    _lastCoinSoundAtMs = now;
-    SystemSound.play(SystemSoundType.click);
-
-    Future.delayed(const Duration(milliseconds: 45), () {
-      if (!mounted || _gameOver) return;
-      SystemSound.play(SystemSoundType.click);
-    });
-  }
-
   void _jump() {
     if (!_isPlaying || _gameOver || _isPaused) return;
     if (_jumpsUsed >= _maxJumps) return;
 
+    final wasGrounded = _isOnGround;
+
     _playerVelocityY =
     _jumpsUsed == 0 ? _jumpVelocity : _jumpVelocity * 0.92;
     _jumpsUsed += 1;
-    _playJumpSound();
+
+    if (wasGrounded) {
+      _spawnJumpDust();
+    }
+
+    _playJumpFeedback();
   }
 
   void _resetWorld({required bool startPlaying, bool autoJump = false}) {
     _obstacles.clear();
     _coins.clear();
+    _dustParticles.clear();
+    _sparkParticles.clear();
 
     _score = 0;
     _coinsCollected = 0;
@@ -542,6 +618,8 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           nearParallaxOffset: _nearParallaxOffset,
                           obstacles: _obstacles,
                           coins: _coins,
+                          dustParticles: _dustParticles,
+                          sparkParticles: _sparkParticles,
                           jumpsRemaining: _maxJumps - _jumpsUsed,
                           gameOver: _gameOver,
                           isPaused: _isPaused,
@@ -549,7 +627,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                         ),
                       ),
                     ),
-
                     Positioned(
                       top: 14,
                       left: 14,
@@ -570,7 +647,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                         ],
                       ),
                     ),
-
                     if (!_isPlaying && !_gameOver)
                       Center(
                         child: OverlayPanel(
@@ -578,10 +654,9 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           subtitle:
                           'Recorde: $_highScore\n\n'
                               'Toque na tela ou pressione Espaço / ↑ / W para começar.\n'
-                              'Duplo pulo, moedas flutuantes, parallax e pausa com P.',
+                              'Versão sem audioplayers, com poeira, brilho e feedback nativo.',
                         ),
                       ),
-
                     if (_isPaused)
                       const Center(
                         child: OverlayPanel(
@@ -590,7 +665,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           'Pressione P, ESC ou o botão de pausa para continuar.',
                         ),
                       ),
-
                     if (_gameOver)
                       const Center(
                         child: OverlayPanel(
@@ -598,7 +672,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           subtitle: 'Toque para reiniciar.',
                         ),
                       ),
-
                     if (_gameOver)
                       Positioned(
                         left: 22,
@@ -610,7 +683,6 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                           highScore: _highScore,
                         ),
                       ),
-
                     const Positioned(
                       left: 16,
                       right: 16,
@@ -662,6 +734,67 @@ class CoinItem {
   final double phase;
 }
 
+class DustParticle {
+  DustParticle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.size,
+    required this.maxLife,
+  });
+
+  double x;
+  double y;
+  double vx;
+  double vy;
+  final double size;
+  double life = 0;
+  final double maxLife;
+
+  bool get alive => life < maxLife;
+  double get progress => 1 - (life / maxLife).clamp(0.0, 1.0);
+
+  void update(double dt) {
+    life += dt;
+    x += vx * dt;
+    y += vy * dt;
+    vy += 200 * dt;
+    vx *= 0.96;
+  }
+}
+
+class SparkParticle {
+  SparkParticle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.size,
+    required this.maxLife,
+  });
+
+  double x;
+  double y;
+  double vx;
+  double vy;
+  final double size;
+  double life = 0;
+  final double maxLife;
+
+  bool get alive => life < maxLife;
+  double get progress => 1 - (life / maxLife).clamp(0.0, 1.0);
+
+  void update(double dt) {
+    life += dt;
+    x += vx * dt;
+    y += vy * dt;
+    vy += 24 * dt;
+    vx *= 0.99;
+    vy *= 0.99;
+  }
+}
+
 class RunnerPainter extends CustomPainter {
   RunnerPainter({
     required this.playerX,
@@ -674,6 +807,8 @@ class RunnerPainter extends CustomPainter {
     required this.nearParallaxOffset,
     required this.obstacles,
     required this.coins,
+    required this.dustParticles,
+    required this.sparkParticles,
     required this.jumpsRemaining,
     required this.gameOver,
     required this.isPaused,
@@ -690,6 +825,8 @@ class RunnerPainter extends CustomPainter {
   final double nearParallaxOffset;
   final List<Obstacle> obstacles;
   final List<CoinItem> coins;
+  final List<DustParticle> dustParticles;
+  final List<SparkParticle> sparkParticles;
   final int jumpsRemaining;
   final bool gameOver;
   final bool isPaused;
@@ -701,7 +838,9 @@ class RunnerPainter extends CustomPainter {
     _drawMoon(canvas, size);
     _drawParallaxLayers(canvas, size);
     _drawGround(canvas, size);
+    _drawDustParticles(canvas);
     _drawCoins(canvas);
+    _drawSparkParticles(canvas);
     _drawObstacles(canvas, size);
     _drawPlayer(canvas, size);
   }
@@ -872,6 +1011,20 @@ class RunnerPainter extends CustomPainter {
     return coin.baseY + sin((animationTime * 4.2) + coin.phase) * 8.0;
   }
 
+  void _drawDustParticles(Canvas canvas) {
+    for (final particle in dustParticles) {
+      final alpha = (particle.progress * 0.45).clamp(0.0, 1.0);
+      final paint = Paint()
+        ..color = const Color(0xFFB0BEC5).withOpacity(alpha);
+
+      canvas.drawCircle(
+        Offset(particle.x, particle.y),
+        particle.size * particle.progress,
+        paint,
+      );
+    }
+  }
+
   void _drawCoins(Canvas canvas) {
     final outerPaint = Paint()..color = const Color(0xFFFFD54F);
     final innerPaint = Paint()..color = const Color(0xFFFFB300);
@@ -887,6 +1040,37 @@ class RunnerPainter extends CustomPainter {
         Offset(center.dx - 3, center.dy - 3),
         2.5,
         shinePaint,
+      );
+    }
+  }
+
+  void _drawSparkParticles(Canvas canvas) {
+    for (final particle in sparkParticles) {
+      final opacity = particle.progress.clamp(0.0, 1.0);
+      final radius = particle.size * particle.progress;
+
+      final circlePaint = Paint()
+        ..color = const Color(0xFFFFF59D).withOpacity(opacity);
+
+      final linePaint = Paint()
+        ..color = Colors.white.withOpacity(opacity)
+        ..strokeWidth = max(0.8, particle.progress * 1.8)
+        ..strokeCap = StrokeCap.round;
+
+      final center = Offset(particle.x, particle.y);
+
+      canvas.drawCircle(center, radius, circlePaint);
+
+      canvas.drawLine(
+        Offset(center.dx - radius * 1.8, center.dy),
+        Offset(center.dx + radius * 1.8, center.dy),
+        linePaint,
+      );
+
+      canvas.drawLine(
+        Offset(center.dx, center.dy - radius * 1.8),
+        Offset(center.dx, center.dy + radius * 1.8),
+        linePaint,
       );
     }
   }
