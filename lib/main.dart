@@ -316,9 +316,9 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
   }
 
   double _requiredGapForPattern(
-      ObstaclePatternKind nextPattern,
-      ObstacleKind? previousKind,
-      ) {
+    ObstaclePatternKind nextPattern,
+    ObstacleKind? previousKind,
+  ) {
     switch (nextPattern) {
       case ObstaclePatternKind.singleGround:
         return previousKind == ObstacleKind.flying ? 180 : 160;
@@ -702,8 +702,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
 
     final wasGrounded = _isOnGround;
 
-    _playerVelocityY =
-    _jumpsUsed == 0 ? _jumpVelocity : _jumpVelocity * 0.92;
+    _playerVelocityY = _jumpsUsed == 0 ? _jumpVelocity : _jumpVelocity * 0.92;
     _jumpsUsed += 1;
 
     if (wasGrounded) {
@@ -927,6 +926,17 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
     return _bankCoins >= cost;
   }
 
+  // Keys para acionar animação de compra em cada card
+  final Map<UpgradeType, GlobalKey<EvolutionUpgradeCardState>>
+      _upgradeCardKeys = {};
+
+  GlobalKey<EvolutionUpgradeCardState> _cardKey(UpgradeType type) {
+    return _upgradeCardKeys.putIfAbsent(
+      type,
+      () => GlobalKey<EvolutionUpgradeCardState>(),
+    );
+  }
+
   Future<void> _buyUpgrade(UpgradeType type) async {
     if (!_canBuyUpgrade(type)) return;
 
@@ -941,6 +951,8 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
         _currentLives = _maxLives;
       }
     });
+
+    _upgradeCardKeys[type]?.currentState?.playBuyAnimation();
 
     await _saveProgress();
   }
@@ -981,6 +993,30 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Conector visual animado entre os dois tiers da árvore.
+  Widget _buildTierConnector({
+    required bool leftUnlocked,
+    required bool rightUnlocked,
+  }) {
+    return SizedBox(
+      height: 56,
+      child: CustomPaint(
+        painter: _TierConnectorPainter(
+          leftUnlocked: leftUnlocked,
+          rightUnlocked: rightUnlocked,
+          animationTime: _animationTime,
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.arrow_downward_rounded,
+            color: Colors.white54,
+            size: 22,
+          ),
+        ),
       ),
     );
   }
@@ -1100,13 +1136,14 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                             UpgradeSectionCard(
                               title: 'Mobilidade e Coleta',
                               subtitle:
-                              'A primeira camada melhora mobilidade e eficiência para farmar moedas.',
+                                  'A primeira camada melhora mobilidade e eficiência para farmar moedas.',
                               accentColor: const Color(0xFF4FC3F7),
                               children: [
                                 EvolutionUpgradeCard(
+                                  key: _cardKey(UpgradeType.extraJumps),
                                   title: _upgradeTitle(UpgradeType.extraJumps),
-                                  description:
-                                  _upgradeDescription(UpgradeType.extraJumps),
+                                  description: _upgradeDescription(
+                                      UpgradeType.extraJumps),
                                   currentEffect: _upgradeCurrentEffectText(
                                     UpgradeType.extraJumps,
                                   ),
@@ -1118,21 +1155,23 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                                   ),
                                   level: _upgradeLevel(UpgradeType.extraJumps),
                                   maxLevel:
-                                  _maxUpgradeLevel(UpgradeType.extraJumps),
+                                      _maxUpgradeLevel(UpgradeType.extraJumps),
                                   nextCost:
-                                  _upgradeNextCost(UpgradeType.extraJumps),
-                                  unlocked:
-                                  _isUpgradeUnlocked(UpgradeType.extraJumps),
+                                      _upgradeNextCost(UpgradeType.extraJumps),
+                                  unlocked: _isUpgradeUnlocked(
+                                      UpgradeType.extraJumps),
                                   canBuy:
-                                  _canBuyUpgrade(UpgradeType.extraJumps),
-                                  icon: Icons.rocket_launch_rounded,
+                                      _canBuyUpgrade(UpgradeType.extraJumps),
+                                  icon: Icons.air_rounded,
+                                  tierColor: const Color(0xFF4FC3F7),
                                   onBuy: () =>
                                       _buyUpgrade(UpgradeType.extraJumps),
                                 ),
                                 EvolutionUpgradeCard(
+                                  key: _cardKey(UpgradeType.magnet),
                                   title: _upgradeTitle(UpgradeType.magnet),
                                   description:
-                                  _upgradeDescription(UpgradeType.magnet),
+                                      _upgradeDescription(UpgradeType.magnet),
                                   currentEffect: _upgradeCurrentEffectText(
                                     UpgradeType.magnet,
                                   ),
@@ -1143,34 +1182,36 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                                     UpgradeType.magnet,
                                   ),
                                   level: _upgradeLevel(UpgradeType.magnet),
-                                  maxLevel: _maxUpgradeLevel(UpgradeType.magnet),
+                                  maxLevel:
+                                      _maxUpgradeLevel(UpgradeType.magnet),
                                   nextCost:
-                                  _upgradeNextCost(UpgradeType.magnet),
+                                      _upgradeNextCost(UpgradeType.magnet),
                                   unlocked:
-                                  _isUpgradeUnlocked(UpgradeType.magnet),
+                                      _isUpgradeUnlocked(UpgradeType.magnet),
                                   canBuy: _canBuyUpgrade(UpgradeType.magnet),
-                                  icon: Icons.blur_circular_rounded,
+                                  icon: Icons.electric_bolt_rounded,
+                                  tierColor: const Color(0xFF4FC3F7),
                                   onBuy: () => _buyUpgrade(UpgradeType.magnet),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 18),
-                            const Icon(
-                              Icons.keyboard_double_arrow_down_rounded,
-                              size: 34,
-                              color: Colors.white54,
+                            const SizedBox(height: 8),
+                            _buildTierConnector(
+                              leftUnlocked: _extraJumpsUpgradeLevel >= 1,
+                              rightUnlocked: _magnetUpgradeLevel >= 1,
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 8),
                             UpgradeSectionCard(
                               title: 'Sobrevivência e Economia',
                               subtitle:
-                              'A segunda camada aumenta sua margem de erro e a rentabilidade de cada moeda.',
+                                  'A segunda camada aumenta sua margem de erro e a rentabilidade de cada moeda.',
                               accentColor: const Color(0xFFFFA726),
                               children: [
                                 EvolutionUpgradeCard(
+                                  key: _cardKey(UpgradeType.extraLife),
                                   title: _upgradeTitle(UpgradeType.extraLife),
-                                  description:
-                                  _upgradeDescription(UpgradeType.extraLife),
+                                  description: _upgradeDescription(
+                                      UpgradeType.extraLife),
                                   currentEffect: _upgradeCurrentEffectText(
                                     UpgradeType.extraLife,
                                   ),
@@ -1182,20 +1223,22 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                                   ),
                                   level: _upgradeLevel(UpgradeType.extraLife),
                                   maxLevel:
-                                  _maxUpgradeLevel(UpgradeType.extraLife),
+                                      _maxUpgradeLevel(UpgradeType.extraLife),
                                   nextCost:
-                                  _upgradeNextCost(UpgradeType.extraLife),
+                                      _upgradeNextCost(UpgradeType.extraLife),
                                   unlocked:
-                                  _isUpgradeUnlocked(UpgradeType.extraLife),
+                                      _isUpgradeUnlocked(UpgradeType.extraLife),
                                   canBuy: _canBuyUpgrade(UpgradeType.extraLife),
-                                  icon: Icons.favorite_rounded,
+                                  icon: Icons.shield_rounded,
+                                  tierColor: const Color(0xFFFFA726),
                                   onBuy: () =>
                                       _buyUpgrade(UpgradeType.extraLife),
                                 ),
                                 EvolutionUpgradeCard(
+                                  key: _cardKey(UpgradeType.fortune),
                                   title: _upgradeTitle(UpgradeType.fortune),
                                   description:
-                                  _upgradeDescription(UpgradeType.fortune),
+                                      _upgradeDescription(UpgradeType.fortune),
                                   currentEffect: _upgradeCurrentEffectText(
                                     UpgradeType.fortune,
                                   ),
@@ -1207,13 +1250,14 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                                   ),
                                   level: _upgradeLevel(UpgradeType.fortune),
                                   maxLevel:
-                                  _maxUpgradeLevel(UpgradeType.fortune),
+                                      _maxUpgradeLevel(UpgradeType.fortune),
                                   nextCost:
-                                  _upgradeNextCost(UpgradeType.fortune),
+                                      _upgradeNextCost(UpgradeType.fortune),
                                   unlocked:
-                                  _isUpgradeUnlocked(UpgradeType.fortune),
+                                      _isUpgradeUnlocked(UpgradeType.fortune),
                                   canBuy: _canBuyUpgrade(UpgradeType.fortune),
-                                  icon: Icons.auto_awesome_rounded,
+                                  icon: Icons.diamond_rounded,
+                                  tierColor: const Color(0xFFFFA726),
                                   onBuy: () => _buyUpgrade(UpgradeType.fortune),
                                 ),
                               ],
@@ -1271,8 +1315,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
       return KeyEventResult.handled;
     }
 
-    if (key == LogicalKeyboardKey.keyP ||
-        key == LogicalKeyboardKey.escape) {
+    if (key == LogicalKeyboardKey.keyP || key == LogicalKeyboardKey.escape) {
       if (_showEvolutionTree) {
         _toggleEvolutionTree();
       } else {
@@ -1369,8 +1412,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                       Center(
                         child: OverlayPanel(
                           title: 'Infinite Runner',
-                          subtitle:
-                          'Recorde: $_highScore\n'
+                          subtitle: 'Recorde: $_highScore\n'
                               'Banco: $_bankCoins moedas\n\n'
                               'Toque na tela ou pressione Espaço / ↑ / W para começar.\n'
                               'Pressione E para abrir a árvore de melhorias.',
@@ -1381,7 +1423,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                         child: OverlayPanel(
                           title: 'Pausado',
                           subtitle:
-                          'Pressione P, ESC ou o botão de pausa para continuar.\n'
+                              'Pressione P, ESC ou o botão de pausa para continuar.\n'
                               'Pressione E para abrir a árvore de melhorias.',
                         ),
                       ),
@@ -1389,8 +1431,7 @@ class _InfiniteRunnerPageState extends State<InfiniteRunnerPage>
                       const Center(
                         child: OverlayPanel(
                           title: 'Game Over',
-                          subtitle:
-                          'Toque para reiniciar.\n'
+                          subtitle: 'Toque para reiniciar.\n'
                               'Abra a árvore de melhorias para gastar suas moedas.',
                         ),
                       ),
@@ -1520,6 +1561,111 @@ class SparkParticle {
     vx *= 0.99;
     vy *= 0.99;
   }
+}
+
+/// Painter que desenha linhas conectoras entre os tiers de upgrade.
+class _TierConnectorPainter extends CustomPainter {
+  _TierConnectorPainter({
+    required this.leftUnlocked,
+    required this.rightUnlocked,
+    required this.animationTime,
+  });
+
+  final bool leftUnlocked;
+  final bool rightUnlocked;
+  final double animationTime;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Linha esquerda (tier1 esquerdo → tier2 esquerdo)
+    _drawConnectorLine(
+      canvas,
+      from: Offset(cx - 220, 0),
+      to: Offset(cx - 220, size.height),
+      unlocked: leftUnlocked,
+      animationTime: animationTime,
+      size: size,
+    );
+
+    // Linha direita (tier1 direito → tier2 direito)
+    _drawConnectorLine(
+      canvas,
+      from: Offset(cx + 220, 0),
+      to: Offset(cx + 220, size.height),
+      unlocked: rightUnlocked,
+      animationTime: animationTime,
+      size: size,
+    );
+
+    // Linha central (mais estreita)
+    _drawConnectorLine(
+      canvas,
+      from: Offset(cx, 0),
+      to: Offset(cx, size.height),
+      unlocked: leftUnlocked && rightUnlocked,
+      animationTime: animationTime + 0.3,
+      size: size,
+    );
+  }
+
+  void _drawConnectorLine(
+    Canvas canvas, {
+    required Offset from,
+    required Offset to,
+    required bool unlocked,
+    required double animationTime,
+    required Size size,
+  }) {
+    if (unlocked) {
+      // Linha base glowing
+      final basePaint = Paint()
+        ..color = const Color(0xFFFFE082).withOpacity(0.22)
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(from, to, basePaint);
+
+      // Partícula animada deslizando pela linha
+      final progress = (animationTime * 0.9) % 1.0;
+      final particleY = from.dy + (to.dy - from.dy) * progress;
+      final particlePaint = Paint()
+        ..color = const Color(0xFFFFE082).withOpacity(0.85)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawCircle(Offset(from.dx, particleY), 5, particlePaint);
+
+      // Partícula trailing
+      final trailProgress =
+          ((animationTime * 0.9) - 0.12).clamp(0.0, 1.0) % 1.0;
+      final trailY = from.dy + (to.dy - from.dy) * trailProgress;
+      final trailPaint = Paint()
+        ..color = const Color(0xFFFFE082).withOpacity(0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(Offset(from.dx, trailY), 3, trailPaint);
+    } else {
+      // Linha tracejada cinza para bloqueado
+      final lockedPaint = Paint()
+        ..color = Colors.white.withOpacity(0.12)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+
+      const dashLen = 6.0;
+      const gapLen = 5.0;
+      double y = from.dy;
+      while (y < to.dy) {
+        final endY = (y + dashLen).clamp(from.dy, to.dy);
+        canvas.drawLine(Offset(from.dx, y), Offset(from.dx, endY), lockedPaint);
+        y += dashLen + gapLen;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TierConnectorPainter oldDelegate) =>
+      oldDelegate.animationTime != animationTime ||
+      oldDelegate.leftUnlocked != leftUnlocked ||
+      oldDelegate.rightUnlocked != rightUnlocked;
 }
 
 class RunnerPainter extends CustomPainter {
@@ -1664,17 +1810,17 @@ class RunnerPainter extends CustomPainter {
   }
 
   void _drawCityLayer(
-      Canvas canvas,
-      Size size, {
-        required double baseY,
-        required double offset,
-        required Color color,
-        required double minWidth,
-        required double widthRange,
-        required double minHeight,
-        required double heightRange,
-        required double gap,
-      }) {
+    Canvas canvas,
+    Size size, {
+    required double baseY,
+    required double offset,
+    required Color color,
+    required double minWidth,
+    required double widthRange,
+    required double minHeight,
+    required double heightRange,
+    required double gap,
+  }) {
     final paint = Paint()..color = color;
 
     double x = -offset;
@@ -1750,8 +1896,7 @@ class RunnerPainter extends CustomPainter {
   void _drawDustParticles(Canvas canvas) {
     for (final particle in dustParticles) {
       final alpha = (particle.progress * 0.45).clamp(0.0, 1.0);
-      final paint = Paint()
-        ..color = const Color(0xFFB0BEC5).withOpacity(alpha);
+      final paint = Paint()..color = const Color(0xFFB0BEC5).withOpacity(alpha);
 
       canvas.drawCircle(
         Offset(particle.x, particle.y),
@@ -1929,16 +2074,19 @@ class RunnerPainter extends CustomPainter {
     final bodyColor = gameOver
         ? const Color(0xFFFF6B6B)
         : isPaused
-        ? const Color(0xFF8AC6D1)
-        : const Color(0xFF50E3C2);
+            ? const Color(0xFF8AC6D1)
+            : const Color(0xFF50E3C2);
 
-    final blink = invulnerabilityTimer > 0 &&
-        (animationTime * 12).floor().isOdd;
+    final blink =
+        invulnerabilityTimer > 0 && (animationTime * 12).floor().isOdd;
 
     final bodyPaint = Paint()..color = bodyColor.withOpacity(blink ? 0.38 : 1);
-    final detailPaint = Paint()..color = Colors.black12.withOpacity(blink ? 0.2 : 1);
-    final eyePaint = Paint()..color = Colors.white.withOpacity(blink ? 0.45 : 1);
-    final pupilPaint = Paint()..color = Colors.black87.withOpacity(blink ? 0.45 : 1);
+    final detailPaint = Paint()
+      ..color = Colors.black12.withOpacity(blink ? 0.2 : 1);
+    final eyePaint = Paint()
+      ..color = Colors.white.withOpacity(blink ? 0.45 : 1);
+    final pupilPaint = Paint()
+      ..color = Colors.black87.withOpacity(blink ? 0.45 : 1);
     final jumpPaint = Paint()..color = const Color(0x88FFFFFF);
 
     canvas.drawRRect(
@@ -2249,7 +2397,7 @@ class UpgradeSectionCard extends StatelessWidget {
   }
 }
 
-class EvolutionUpgradeCard extends StatelessWidget {
+class EvolutionUpgradeCard extends StatefulWidget {
   const EvolutionUpgradeCard({
     super.key,
     required this.title,
@@ -2264,6 +2412,7 @@ class EvolutionUpgradeCard extends StatelessWidget {
     required this.canBuy,
     required this.icon,
     required this.onBuy,
+    this.tierColor = const Color(0xFF4FC3F7),
   });
 
   final String title;
@@ -2278,167 +2427,414 @@ class EvolutionUpgradeCard extends StatelessWidget {
   final bool canBuy;
   final IconData icon;
   final VoidCallback onBuy;
+  final Color tierColor;
+
+  @override
+  State<EvolutionUpgradeCard> createState() => EvolutionUpgradeCardState();
+}
+
+class EvolutionUpgradeCardState extends State<EvolutionUpgradeCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _buyController;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _glowAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _buyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
+    );
+    _scaleAnim = TweenSequence([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.06)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.06, end: 0.97)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.97, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 35,
+      ),
+    ]).animate(_buyController);
+
+    _glowAnim = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _buyController,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+        reverseCurve: Curves.easeIn,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _buyController.dispose();
+    super.dispose();
+  }
+
+  void playBuyAnimation() {
+    _buyController.forward(from: 0.0);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isMaxed = level >= maxLevel;
+    final isMaxed = widget.level >= widget.maxLevel;
+    final unlocked = widget.unlocked;
 
-    return Container(
-      width: 430,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: unlocked
-              ? const [
-            Color(0xAA16243C),
-            Color(0xAA243E67),
-          ]
-              : const [
-            Color(0xAA1B1E27),
-            Color(0xAA272B35),
-          ],
-        ),
-        border: Border.all(
-          color: unlocked ? Colors.white12 : Colors.white10,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.14),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return AnimatedBuilder(
+      animation: _buyController,
+      builder: (context, child) {
+        final glowOpacity = _glowAnim.value;
+        return Transform.scale(
+          scale: _scaleAnim.value,
+          child: Stack(
             children: [
-              CircleAvatar(
-                radius: 23,
-                backgroundColor: Colors.white12,
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+              // Glow de compra
+              if (glowOpacity > 0)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFE082)
+                                .withOpacity(glowOpacity * 0.55),
+                            blurRadius: 28,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
+                width: 430,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.black.withOpacity(0.18),
-                ),
-                child: Text(
-                  unlocked ? 'Ativo' : 'Bloqueado',
-                  style: TextStyle(
-                    color: unlocked ? Colors.white70 : Colors.redAccent.shade100,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: unlocked
+                        ? [
+                            const Color(0xAA16243C),
+                            const Color(0xAA243E67),
+                          ]
+                        : [
+                            const Color(0xFF1A1D26),
+                            const Color(0xFF22252F),
+                          ],
                   ),
+                  border: Border.all(
+                    color: glowOpacity > 0
+                        ? Color.lerp(Colors.white12, const Color(0xFFFFE082),
+                            glowOpacity)!
+                        : unlocked
+                            ? widget.tierColor.withOpacity(0.28)
+                            : Colors.white.withOpacity(0.07),
+                    width: glowOpacity > 0 ? 2 : 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.14),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // Ícone com cor de tier
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: unlocked
+                                  ? [
+                                      widget.tierColor.withOpacity(0.35),
+                                      widget.tierColor.withOpacity(0.08),
+                                    ]
+                                  : [
+                                      Colors.white10,
+                                      Colors.white.withOpacity(0.04),
+                                    ],
+                            ),
+                            border: Border.all(
+                              color: unlocked
+                                  ? widget.tierColor.withOpacity(0.5)
+                                  : Colors.white12,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(
+                            widget.icon,
+                            color: unlocked ? widget.tierColor : Colors.white38,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            style: TextStyle(
+                              color: unlocked ? Colors.white : Colors.white54,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        // Badge de status: cadeado ou ativo/max
+                        if (!unlocked)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.black.withOpacity(0.3),
+                              border: Border.all(
+                                color: Colors.redAccent.withOpacity(0.4),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.lock_rounded,
+                                  size: 12,
+                                  color: Colors.redAccent.shade100,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Bloqueado',
+                                  style: TextStyle(
+                                    color: Colors.redAccent.shade100,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.black.withOpacity(0.18),
+                            ),
+                            child: Text(
+                              isMaxed ? 'MAX ★' : 'Ativo',
+                              style: TextStyle(
+                                color: isMaxed
+                                    ? const Color(0xFFFFE082)
+                                    : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      widget.description,
+                      style: TextStyle(
+                        color: unlocked ? Colors.white70 : Colors.white38,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Barras de nível
+                    Row(
+                      children: List.generate(widget.maxLevel, (index) {
+                        final filled = index < widget.level;
+                        return Container(
+                          width: 26,
+                          height: 8,
+                          margin: EdgeInsets.only(
+                              right: index == widget.maxLevel - 1 ? 0 : 6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(99),
+                            color: filled
+                                ? widget.tierColor
+                                : Colors.white.withOpacity(0.12),
+                            boxShadow: filled
+                                ? [
+                                    BoxShadow(
+                                      color: widget.tierColor.withOpacity(0.5),
+                                      blurRadius: 6,
+                                    )
+                                  ]
+                                : null,
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.black.withOpacity(0.14),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.currentEffect,
+                            style: TextStyle(
+                              color: unlocked
+                                  ? const Color(0xFFFFE082)
+                                  : Colors.white38,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isMaxed
+                                ? 'Nível máximo alcançado!'
+                                : widget.nextEffect,
+                            style: TextStyle(
+                              color: unlocked ? Colors.white70 : Colors.white30,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        if (!unlocked)
+                          const Icon(
+                            Icons.lock_outline_rounded,
+                            size: 13,
+                            color: Colors.redAccent,
+                          ),
+                        if (!unlocked) const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.requirementText,
+                            style: TextStyle(
+                              color: unlocked
+                                  ? Colors.white60
+                                  : Colors.redAccent.shade100,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: (!unlocked || !widget.canBuy || isMaxed)
+                            ? null
+                            : widget.onBuy,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: unlocked && widget.canBuy && !isMaxed
+                              ? widget.tierColor.withOpacity(0.22)
+                              : null,
+                          foregroundColor: unlocked && widget.canBuy && !isMaxed
+                              ? widget.tierColor
+                              : null,
+                          side: unlocked && widget.canBuy && !isMaxed
+                              ? BorderSide(
+                                  color: widget.tierColor.withOpacity(0.5),
+                                )
+                              : null,
+                        ),
+                        icon: Icon(
+                          isMaxed
+                              ? Icons.verified_rounded
+                              : !unlocked
+                                  ? Icons.lock_rounded
+                                  : Icons.upgrade_rounded,
+                        ),
+                        label: Text(
+                          isMaxed
+                              ? 'MAX'
+                              : !unlocked
+                                  ? 'Bloqueado'
+                                  : 'Comprar • ${widget.nextCost ?? '-'}  🪙',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              // Overlay cinza com cadeado para nós bloqueados
+              if (!unlocked)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      color: Colors.black.withOpacity(0.42),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withOpacity(0.55),
+                                border: Border.all(
+                                  color: Colors.redAccent.withOpacity(0.55),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.lock_rounded,
+                                color: Colors.redAccent.shade100,
+                                size: 32,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.requirementText,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.redAccent.shade100,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: List.generate(maxLevel, (index) {
-              final filled = index < level;
-              return Container(
-                width: 26,
-                height: 8,
-                margin: EdgeInsets.only(right: index == maxLevel - 1 ? 0 : 6),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(99),
-                  color: filled
-                      ? const Color(0xFFFFE082)
-                      : Colors.white.withOpacity(0.12),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.black.withOpacity(0.14),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  currentEffect,
-                  style: const TextStyle(
-                    color: Color(0xFFFFE082),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isMaxed ? 'Próximo: nível máximo alcançado' : nextEffect,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            requirementText,
-            style: TextStyle(
-              color: unlocked ? Colors.white60 : Colors.redAccent.shade100,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: (!unlocked || !canBuy || isMaxed) ? null : onBuy,
-              icon: Icon(
-                isMaxed ? Icons.verified_rounded : Icons.upgrade_rounded,
-              ),
-              label: Text(
-                isMaxed
-                    ? 'MAX'
-                    : !unlocked
-                    ? 'Bloqueado'
-                    : 'Comprar • ${nextCost ?? '-'}',
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
